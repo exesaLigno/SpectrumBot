@@ -1,0 +1,6 @@
+*.secret
+*.png
+*.db
+*.ogg
+__pycache__
+.venv
