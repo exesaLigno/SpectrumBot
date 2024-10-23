@@ -22,3 +22,5 @@ class TelegramAPI(object):
                 continue
 
         return responce
+    
+    

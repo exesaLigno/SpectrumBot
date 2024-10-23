@@ -1,10 +1,13 @@
 from typing import Callable, Any, Type
 
 class Handler:
-    def __init__(self, handler: Callable):
+    def __init__(self, handler: Callable, additional: bool = False, **rules):
         self.__handler: Callable = handler
         if len(self.__annotations__) == 0:
             raise ValueError(f'Function {self.__name__}() must have type annotation')
+        
+        self.__rules = rules
+        self.__additional = additional
 
 
     def __call__(self, *args, **kwargs):
@@ -47,18 +50,21 @@ class Handler:
         return True, None
     
 
-    def correspondes(self, *args: list[Any], **kwars: dict[str, Any]) -> bool:
-        correct, _ = self.__checkTypesCorrespondence(args, kwars)
+    def correspondesToTypes(self, *args: list[Any], **kwars: dict[str, Any]) -> bool:
+        correct, _ = self.__checkTypesCorrespondence(*args, **kwars)
         return correct
     
+
     @property
     def __annotations__(self) -> dict[str, Any]:
         return self.__handler.__annotations__
     
+
     @property
     def __name__(self) -> str:
         return self.__handler.__name__
     
+
     def __str__(self) -> str:
 
         args: list[str] = []
@@ -75,9 +81,28 @@ class Handler:
         
         return f'<function {self.__name__}({args_str}){ret_str}>'
     
+    
     @staticmethod
     def __className(cls: Type | None):
         if cls is None:
             return 'None'
         else:
             return cls.__name__
+
+
+    def correspondesToRules(self, properties: dict[str, Any]) -> tuple[bool, int]:
+        used_rules = 0
+        correspondes = True
+        for rule_name in self.__rules:
+            if rule_name in properties:
+                if self.__rules[rule_name] != properties[rule_name]:
+                    correspondes = False
+                    break
+                used_rules += 1
+        
+        return correspondes, used_rules
+    
+    @property
+    def isAdditional(self) -> bool:
+        return self.__additional
+

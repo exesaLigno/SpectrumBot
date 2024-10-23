@@ -8,6 +8,7 @@ class Message(TelegramAPI):
     class Type(Enum):
         UNKNOWN = 0
         PLAIN_MESSAGE = 1   # Contains only text
+        COMMAND = 11        # Contains only text (starting from /)
         VOICE_MESSAGE = 2   # Contains only voice
         VIDEO_MESSAGE = 3   # Contains only video_note
         LOCATION = 4        # Contains only location
@@ -28,9 +29,11 @@ class Message(TelegramAPI):
         self.text: str | None = None
         self.media: Any = None
 
-        if 'text' in message_dict: 
+        if 'text' in message_dict:
             self.type = self.Type.PLAIN_MESSAGE
             self.text = message_dict['text']
+            if self.isCommand:
+                self.type = self.Type.COMMAND
 
         elif 'document' in message_dict:
             self.type = self.Type.DOCUMENT
