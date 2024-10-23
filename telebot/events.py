@@ -1,7 +1,8 @@
 from telebot.api import TelegramAPI
 from enum import Enum
 from typing import Any, Self
-
+from io import BytesIO
+import requests
 
 class Message(TelegramAPI):
 
@@ -24,7 +25,7 @@ class Message(TelegramAPI):
         self.from_id: int = message_dict['from']['id']
         self.chat_id: int = message_dict['chat']['id']
         self.timestamp: int = message_dict['date']
-        self.type: self.Type = self.Type.UNKNOWN
+        self.type: Message.Type = self.Type.UNKNOWN
 
         self.text: str | None = None
         self.media: Any = None
@@ -79,5 +80,12 @@ class Message(TelegramAPI):
             while ' ' in parts: parts.remove(' ')
             return parts[0], parts[1:]
         else:
-            raise AttributeError('This message has no attribute\'command\'', name='command')
+            raise AttributeError('This message has no attribute \'command\'', name='command')
+        
+    def answer(self: Self, text: str | None = None, photo: BytesIO | bytes | None = None) -> Self | None:
+        responce = self.sendMessage(self.chat_id, text=text, photo=photo)
+        if responce['connection_established'] and responce['ok']:
+            return Message(responce['message'])
+        
+        return None
 

@@ -25,10 +25,13 @@ class AudioSpectre:
         FIT_TO_DATA = 1
         FULL = 2
 
-    def __init__(self, filename: str, window: str = 'blackman', window_size: int = 2000, overlap: int = 3 * 2000 // 4, fft_size: int = 10000):
+    def __init__(self, file: str | BytesIO, window: str = 'blackman', window_size: int = 2000, overlap: int = 3 * 2000 // 4, fft_size: int = 10000):
         try:
-            self.filename: str = filename
-            sound = readSound(filename)
+            if (isinstance(file, str)):
+                self.filename: str = file
+            else:
+                self.filename: str = 'audio'
+            sound = readSound(file)
             self.bins: np.ndarray = sound[0]
             self.frequency: int = sound[1]
         except Exception as error:
@@ -43,8 +46,8 @@ class AudioSpectre:
         self.stft_Zxx: np.ndarray | None = None
         self.stft_plot: bytes | None = None
         self.plot: bytes | None = None
-        self.scale: self.Scale = self.Scale.AUTO
-        self.limits: self.Limits = self.Limits.AUTO
+        self.scale: AudioSpectre.Scale = self.Scale.AUTO
+        self.limits: AudioSpectre.Limits = self.Limits.AUTO
 
     @property
     def COLASatisfied(self) -> bool:
