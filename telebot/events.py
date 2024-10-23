@@ -33,7 +33,7 @@ class Message(TelegramAPI):
         if 'text' in message_dict:
             self.type = self.Type.PLAIN_MESSAGE
             self.text = message_dict['text']
-            if self.isCommand:
+            if self.text[0] == '/':
                 self.type = self.Type.COMMAND
 
         elif 'document' in message_dict:
@@ -69,7 +69,7 @@ class Message(TelegramAPI):
 
     @property
     def isCommand(self: Self) -> bool:
-        return (self.type == self.Type.PLAIN_MESSAGE and 
+        return (self.type == self.Type.COMMAND and 
                 self.text is not None and
                 self.text[0] == '/')
     
@@ -85,7 +85,17 @@ class Message(TelegramAPI):
     def answer(self: Self, text: str | None = None, photo: BytesIO | bytes | None = None) -> Self | None:
         responce = self.sendMessage(self.chat_id, text=text, photo=photo)
         if responce['connection_established'] and responce['ok']:
-            return Message(responce['message'])
+            return Message(self.token, responce['result'])
         
         return None
+    
+    def reply(self: Self, text: str | None = None, photo: BytesIO | bytes | None = None) -> Self | None:
+        responce = self.sendMessage(self.chat_id, text=text, photo=photo, reply_to=self.message_id)
+        if responce['connection_established'] and responce['ok']:
+            return Message(self.token, responce['result'])
+        
+        return None
+    
+    def delete(self: Self) -> None:
+        responce = self.deleteMessage(self.chat_id, self.message_id)
 

@@ -37,6 +37,9 @@ class AudioSpectre:
         except Exception as error:
             raise error
         
+        # Duration in seconds
+        self.duration: float = len(self.bins) / self.frequency
+        
         self.windowSize: int = window_size
         self.fftSize: int = fft_size
         self.overlap: int = overlap
@@ -210,7 +213,7 @@ class AudioSpectre:
     
     def autoScale(self) -> Scale:
         if self.scale == self.Scale.AUTO:
-            return self.Scale.LINEAR
+            return self.Scale.LOGARITHMIC
         return self.scale
     
     @classmethod

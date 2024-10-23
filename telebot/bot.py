@@ -7,6 +7,7 @@ from telebot.handler import Handler
 from netifaces import interfaces, ifaddresses, AF_INET
 import getpass
 from typing import Any, Callable
+from threading import Thread
 
 
 class TelegramBot(TextPreprocessor, KeyboardPreprocessor, TelegramAPI):
@@ -86,6 +87,7 @@ class TelegramBot(TextPreprocessor, KeyboardPreprocessor, TelegramAPI):
 
         if len(appropriate_handlers) == 0:
             print('No handler for this event!')
+            return
         appropriate_handlers.sort(key=lambda pair: pair[0], reverse=True)
         main_handler = appropriate_handlers[0][1]
         additional_handlers = list(map(lambda handler: handler[1], filter(lambda handler: handler[1].isAdditional, appropriate_handlers[1:])))
