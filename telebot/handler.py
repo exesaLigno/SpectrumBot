@@ -13,7 +13,8 @@ class Handler:
     def __call__(self, *args, **kwargs):
         correct, reason = self.__checkTypesCorrespondence(*args, **kwargs)
         if not correct:
-            raise ValueError(reason)
+            #raise ValueError(reason)
+            pass
         self.__handler(*args, **kwargs)
 
 

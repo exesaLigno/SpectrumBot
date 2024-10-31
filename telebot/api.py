@@ -61,16 +61,16 @@ class TelegramAPI(object):
     def sendMessage(self, chat_id, text: str | None, photo: BytesIO | bytes | None = None, reply_to: int | None = None):
         reply_params = None
         if reply_to is not None:
-            reply_params = {'message_id': reply_to}
+            reply_params = dumps({'message_id': reply_to})
 
         if photo is not None:
             if isinstance(photo, BytesIO):
                 photo = photo.read()
             
-            return self.__makeRequest('sendPhoto', post_arguments={'photo': photo}, chat_id=chat_id, caption=text, reply_parameters=dumps(reply_params))
+            return self.__makeRequest('sendPhoto', post_arguments={'photo': photo}, chat_id=chat_id, caption=text, reply_parameters=reply_params)
         
         else:
-            return self.__makeRequest('sendMessage', chat_id=chat_id, text=text, reply_parameters=dumps(reply_params))
+            return self.__makeRequest('sendMessage', chat_id=chat_id, text=text, reply_parameters=reply_params)
         
     def deleteMessage(self, chat_id, message_id):
         return self.__makeRequest('deleteMessage', chat_id=chat_id, message_id=message_id)
