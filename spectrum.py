@@ -103,6 +103,8 @@ class AudioSpectre:
             io.seek(0)
             self.stft_plot = io.read()
 
+        plt.close(fig)
+
     @property
     def STFTPlot(self) -> bytes:
         if self.stft_plot is None:
@@ -124,6 +126,7 @@ class AudioSpectre:
             fig.savefig(io, format='png', facecolor='black', transparent=False)
             io.seek(0)
             self.plot = io.read()
+        plt.close(fig)
 
 
     @property
@@ -254,6 +257,7 @@ if __name__ == '__main__':
     plt.plot(test)
     plt.grid()
     plt.savefig('test_graph.png')
+    plt.close()
 
     #pprint(audio.globalSpikes())
     #fig.savefig('test.png', transparent=False)
