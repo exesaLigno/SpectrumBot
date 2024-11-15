@@ -9,21 +9,21 @@ from io import BytesIO
 from PIL.Image import Image, new as newImage, open as openImage
 from pprint import pprint
 
+np.seterr(all='ignore')
+
+class Scale(Enum):
+    LOGARITHMIC = 1
+    LINEAR = 2
+
+class Limits(Enum):
+    FIT_TO_DATA = 1
+    FULL = 2
+
 class AudioSpectre:
 
     MIN_DECIBEL_LEVEL: int = -60
     DPI: int = 200
     DROP_LEVEL: float = 0.9 # drop spike if it is <DROP_LEVEL> percent lower
-
-    class Scale(Enum):
-        AUTO = 0
-        LOGARITHMIC = 1
-        LINEAR = 2
-
-    class Limits(Enum):
-        AUTO = 0
-        FIT_TO_DATA = 1
-        FULL = 2
 
     def __init__(self, file: str | BytesIO, window: str = 'blackman', window_size: int = 2000, overlap: int = 3 * 2000 // 4, fft_size: int = 10000):
         try:
@@ -47,10 +47,6 @@ class AudioSpectre:
         self.stft_f: np.ndarray | None = None
         self.stft_t: np.ndarray | None = None
         self.stft_Zxx: np.ndarray | None = None
-        self.stft_plot: bytes | None = None
-        self.plot: bytes | None = None
-        self.scale: AudioSpectre.Scale = self.Scale.AUTO
-        self.limits: AudioSpectre.Limits = self.Limits.AUTO
 
     @property
     def COLASatisfied(self) -> bool:
@@ -72,21 +68,20 @@ class AudioSpectre:
             self.__buildSTFT()
         return (self.stft_f, self.stft_t, self.stft_Zxx)
     
-    def __buildSTFTPlot(self) -> None:
+    def STFTPlot(self, scale: Scale = Scale.LOGARITHMIC, limits: Limits = Limits.FIT_TO_DATA) -> bytes:
         f, t, Zxx = self.STFT
         fig = plt.figure(figsize=[13.5, 7], dpi=self.DPI, frameon=False)
 
-        scale = self.autoScale()
-        f_min, f_max = self.autoLimits()
-        if f_min == 0 and scale == self.Scale.LOGARITHMIC:
+        f_min, f_max = self.calculateLimits(mode=limits)
+
+        if f_min == 0 and scale == Scale.LOGARITHMIC:
             f_min = 1
         
         f_labels = self.getFrequencyLabels((f_min, f_max), scale=scale)
         ax: plt.Axes = fig.add_axes([0, 0, 1, 1])
         ax.axis('off')
 
-
-        if scale == self.Scale.LOGARITHMIC: ax.set_yscale('symlog')
+        if scale == Scale.LOGARITHMIC: ax.set_yscale('symlog')
         
         for freq in f_labels:
             lbl = ax.text(t[-1] * 1.003, freq, f'{self.getLabelText(freq)} -', 
@@ -101,57 +96,48 @@ class AudioSpectre:
         with BytesIO() as io:
             fig.savefig(io, format='png', facecolor='black', transparent=False)
             io.seek(0)
-            self.stft_plot = io.read()
+            stft_plot = io.read()
 
         plt.close(fig)
-
-    @property
-    def STFTPlot(self) -> bytes:
-        if self.stft_plot is None:
-            self.__buildSTFTPlot()
-        return self.stft_plot
+        return stft_plot
     
-    def __buildPlot(self) -> None:
+    def AudioPlot(self) -> bytes:
         fig = plt.figure(figsize=[13.5, 1.5], dpi=self.DPI, frameon=True)
         ax: plt.Axes = fig.add_axes([0, 0, 1, 1])
         ax.axis('off')
         ax.plot(self.bins)
         ax.set_xlim(0, len(self.bins))
         height = max(self.bins) - min(self.bins)
-        ax.set_ylim(min(self.bins) - 0.03 * height, max(self.bins) + 0.03 * height)
+        if height != 0:
+            ax.set_ylim(min(self.bins) - 0.03 * height, max(self.bins) + 0.03 * height)
         filename = ax.text(0, 0, f'    {self.filename} ({len(self.bins) / self.frequency:.1f} sec)', size=18, color='white', horizontalalignment='left', verticalalignment='center')
         filename.set_path_effects([pe.withStroke(linewidth=2, foreground='k')])
         ax.grid()
         with BytesIO() as io:
             fig.savefig(io, format='png', facecolor='black', transparent=False)
             io.seek(0)
-            self.plot = io.read()
+            plot = io.read()
+
         plt.close(fig)
 
-
-    @property
-    def Plot(self) -> bytes:
-        if self.plot is None:
-            self.__buildPlot()
-        return self.plot
+        return plot
     
-    @property
-    def Spectre(self) -> bytes:
-        img1 = BytesIO()
-        img1.write(self.STFTPlot)
-        img1.seek(0)
+    def Spectre(self, scale: Scale = Scale.LOGARITHMIC, limits: Limits = Limits.FIT_TO_DATA) -> bytes:
+        img1 = BytesIO(self.STFTPlot(scale=scale, limits=limits))
         stft_image = openImage(img1, mode='r')
-        img2 = BytesIO()
-        img2.write(self.Plot)
-        img2.seek(0)
+        
+        img2 = BytesIO(self.AudioPlot())
         audio_image = openImage(img2, mode='r')
+
         result = newImage(stft_image.mode, (stft_image.width, stft_image.height + audio_image.height))
         result.paste(stft_image, (0, 0))
         result.paste(audio_image, (0, stft_image.height))
         with BytesIO() as io:
             result.save(io, format='png')
             io.seek(0)
-            return io.read()
+            spectrum = io.read()
+
+        return spectrum
         
     @property
     def globalSpikes(self) -> dict[float, float]:
@@ -190,8 +176,8 @@ class AudioSpectre:
 
         return spikes
     
-    def autoLimits(self, fit_to_data: bool = True) -> tuple[float, float]:
-        if self.limits == self.Limits.AUTO:
+    def calculateLimits(self, mode: Limits = Limits.FULL) -> tuple[float, float]:
+        if mode == Limits.FIT_TO_DATA:        
             spikes = self.globalSpikes
             min = np.min(list(spikes.keys()))
             max = np.max(list(spikes.keys()))
@@ -201,23 +187,9 @@ class AudioSpectre:
             if min < 0: min = 0
             if max > self.frequency // 2: max = self.frequency // 2
             return min, max
-        elif self.limits == self.Limits.FIT_TO_DATA:        
-            spikes = self.globalSpikes
-            min = np.min(list(spikes.keys()))
-            max = np.max(list(spikes.keys()))
-            delta = max - min
-            min = min - 0.1 * delta
-            max = max + 0.1 * delta
-            if min < 0: min = 0
-            if max > self.frequency // 2: max = self.frequency // 2
-            return min, max
-        elif self.limits == self.Limits.FULL:
+        
+        else:
             return 0, self.frequency // 2
-    
-    def autoScale(self) -> Scale:
-        if self.scale == self.Scale.AUTO:
-            return self.Scale.LOGARITHMIC
-        return self.scale
     
     @classmethod
     def getLabelText(cls, frequency: float) -> str:
@@ -233,7 +205,7 @@ class AudioSpectre:
     @classmethod
     def getFrequencyLabels(cls, f_lims: list[float], scale: Scale = Scale.LINEAR, labels_count: int = 5) -> list[float]:
         
-        if scale == cls.Scale.LOGARITHMIC:
+        if scale == Scale.LOGARITHMIC:
             step = (f_lims[1] / f_lims[0]) ** (1 / (labels_count + 1))
             labels = [f_lims[0] * step ** n for n in range(1, labels_count + 1)]
         else: 
