@@ -4,7 +4,18 @@ from typing import Any, Self
 from io import BytesIO
 import requests
 
-class Message(TelegramAPI):
+
+class Event(TelegramAPI):
+
+    def __init__(self: Self, token: str):
+        TelegramAPI.__init__(self, token=token)
+
+    @property
+    def properties(self) -> dict[str, str]:
+        return {'type': type(self)}
+
+
+class Message(Event):
 
     class Type(Enum):
         UNKNOWN = 0
@@ -20,7 +31,7 @@ class Message(TelegramAPI):
 
 
     def __init__(self: Self, token: str, message_dict: dict):
-        TelegramAPI.__init__(self, token=token)
+        Event.__init__(self, token=token)
         self.message_id: int = message_dict['message_id']
         self.from_id: int = message_dict['from']['id']
         self.chat_id: int = message_dict['chat']['id']
@@ -89,13 +100,38 @@ class Message(TelegramAPI):
         
         return None
     
-    def reply(self: Self, text: str | None = None, photo: BytesIO | bytes | None = None) -> Self | None:
-        responce = self.sendMessage(self.chat_id, text=text, photo=photo, reply_to=self.message_id)
+    def reply(self: Self, text: str | None = None, photo: BytesIO | bytes | None = None, keyboard: list[list[tuple[str, str]]] | None = None) -> Self | None:
+        responce = self.sendMessage(self.chat_id, text=text, photo=photo, reply_to=self.message_id, keyboard=keyboard)
         if responce['connection_established'] and responce['ok']:
             return Message(self.token, responce['result'])
+        
+        else:
+            print(responce)
         
         return None
     
     def delete(self: Self) -> None:
         responce = self.deleteMessage(self.chat_id, self.message_id)
+        return responce['connection_established'] and responce['ok']
+    
+    @property
+    def properties(self) -> dict[str, str]:
+        base_props = super().properties
+        base_props['message_type'] = self.type
+        return base_props
 
+
+from pprint import pprint
+class Callback(Event):
+
+    def __init__(self: Self, token: str, callback_dict: dict):
+        Event.__init__(self, token=token)
+
+        self.id = callback_dict['id']
+        self.from_id = callback_dict['from']['id']
+        self.message = Message(self.token, callback_dict['message'])
+        self.data = callback_dict['data']
+
+    def answer(self: Self, text: str, show_alert: bool = False):
+        responce = self.answerCallbackQuery(self.id, text, show_alert=show_alert)
+        return responce['connection_established'] and responce['ok']

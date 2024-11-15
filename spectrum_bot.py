@@ -1,8 +1,8 @@
 from telebot.bot import TelegramBot
 from telebot.user import User
 from telebot.database import DBSettings
-from telebot.events import Message
-from spectrum import AudioSpectre
+from telebot.events import Message, Callback
+from spectrum import AudioSpectre, Scale, Limits
 from time import time
 
 DBSettings.path = 'test.db'
@@ -15,14 +15,24 @@ bot = TelegramBot(token=token_str)
 @bot.registerHandler(type=Message, message_type=Message.Type.VOICE_MESSAGE)
 def handleVoiceMessage(message: Message) -> None:
     notification = message.reply(text='Processing your audio')
+
     audio_file = message.getFile(message.media['file_id'])
     s = AudioSpectre(audio_file)
-    photo = s.Spectre
-    message.reply(text='Here is the spectre of provided audio', photo=photo)
+    photo = s.Spectre(scale=Scale.LINEAR, limits=Limits.FULL)
+
+    message.reply(text='Here is the spectre of provided audio', photo=photo, 
+                  keyboard=[
+                      [('Switch to logarithmic scale', 'logscale')], 
+                      [('Fit to content', 'fit-content')]
+                  ])
     notification.delete()
 
+@bot.registerHandler(type=Callback)
+def handleCallback(callback: Callback):
+    callback.answer('Not implemented', show_alert=False)
+
 @bot.registerHandler(type=Message, message_type=Message.Type.COMMAND)
-def handleCommand(message: Message, *cmd: list[str]) -> None:
+def handleCommand(message: Message) -> None:
     if message.command[0] == '/help' or message.command[0] == '/start':
         message.answer(text=f'Just send audio-message to this bot and enjoy spectrum of provided audio. In future bot would provide detailed information about provided audio.')
 

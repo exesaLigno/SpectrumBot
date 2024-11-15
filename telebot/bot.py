@@ -2,43 +2,50 @@ from telebot.abstract import TextPreprocessor, KeyboardPreprocessor
 from telebot.api import TelegramAPI
 from telebot.logger import Logger
 from telebot.user import User
-from telebot.events import Message
+from telebot.events import Message, Callback, Event
 from telebot.handler import Handler
 from netifaces import interfaces, ifaddresses, AF_INET
 import getpass
-from typing import Any, Callable
+from typing import Any, Callable, NoReturn, Self
 from threading import Thread
-
+from queue import Queue
+import traceback
 
 class TelegramBot(TextPreprocessor, KeyboardPreprocessor, TelegramAPI):
 
-    def __init__(self, token: str):
+    def __init__(self: Self, token: str):
         TextPreprocessor.__init__(self, 'bot')
         KeyboardPreprocessor.__init__(self, 'bot')
         TelegramAPI.__init__(self, token)
         self.__botname: str | None = None
         self.__name: str | None = None
         self.__polling_offset: int = 0
-        self.__event_queue: list[Any] = []
+        self.__queue: Queue[Event] = Queue()
         self.__handlers: list[Handler] = []
 
+
     @property
-    def botname(self):
+    def botname(self: Self) -> str:
         if self.__botname == None:
-            self.__setMe()
+            self.getMe()
         return self.__botname
 
+
     @property
-    def name(self):
+    def name(self: Self) -> str:
         if self.__name == None:
-            self.__setMe()
+            self.getMe()
         return self.__name
 
-    def __setMe(self):
-        bot_info = self.__makeRequest("getMe")
+
+    def getMe(self: Self) -> None:
+        bot_info = super().getMe()
+        self.__botname = bot_info['username']
+        self.__name = bot_info['first_name']
+
 
     @property
-    def host_ip(self):
+    def host_ip(self: Self) -> str:
         for ifaceName in interfaces():
             addresses = [i['addr'] for i in ifaddresses(ifaceName).setdefault(AF_INET, [{'addr':'No IP addr'}] )]
             for addr in addresses:
@@ -46,59 +53,81 @@ class TelegramBot(TextPreprocessor, KeyboardPreprocessor, TelegramAPI):
                     return addr
         return "Unknown IP"
 
+
     @property
-    def host_username(self):
+    def host_username(self: Self) -> str:
         return getpass.getuser()
     
-    def __getUpdates(self):
+
+    def __getUpdates(self: Self) -> None:
         updates = self._TelegramAPI__makeRequest("getUpdates", offset = self.__polling_offset, timeout = 1)
 
         if updates["ok"] and len(updates["result"]) > 0:
-            self.__event_queue += updates["result"]
+            for event in updates["result"]:
+                if 'message' in event:
+                    self.__queue.put(Message(self.token, event['message']))
+                elif 'callback_query' in event:
+                    self.__queue.put(Callback(self.token, event['callback_query']))
+                else:
+                    print(f'Unsupported event {event}')
+
             self.__polling_offset = updates["result"][-1]["update_id"] + 1
 
-    def polling(self):
-        while True:
-            self.__getUpdates()
-            while len(self.__event_queue) != 0:
-                event = self.__event_queue.pop(-1)
-                event_obj = None
-                properties = {}
-                if 'message' in event:
-                    event_obj = Message(self.token, event['message'])
-                    properties = {'type': Message, 'message_type': event_obj.type}
-                    if event_obj.isCommand:
-                        self.__chooseHandler(properties, event_obj, *event_obj.command)
-                    else:
-                        self.__chooseHandler(properties, event_obj)
-                
 
+    def __polling_sync(self: Self) -> NoReturn:
+        while True:
+
+            self.__getUpdates()
+
+            if not self.__queue.empty():
+                event = self.__queue.get()
+                handlers = self.__chooseHandlers(event)
+
+                for handler in handlers:
+                    handler(event)
+
+
+    def __polling_async(self: Self) -> NoReturn:
+        pass
+
+
+    def polling(self, async_run: bool = False, supress_exceptions: bool = False) -> None:
+        while True:
+            try:
+                if async_run:
+                    self.__polling_async()
+                else:
+                    self.__polling_sync()                    
+            
+            except Exception as error:
+                if supress_exceptions:
+                    print(f'Error {error} occured')
+                    continue
+                else:
+                    traceback.print_exc()
+                    break
                     
 
-    def __chooseHandler(self, properties, *args, **kwargs):
+    def __chooseHandlers(self: Self, event: Event) -> list[Handler]:
         appropriate_handlers: list[tuple[int, Handler]] = []
 
         for handler in self.__handlers:
-            #correct_types = handler.correspondesToTypes(*args, **kwargs)
-            correct_rules, nrules = handler.correspondesToRules(properties)
+            correct_rules, nrules = handler.correspondesToRules(event.properties)
 
             if correct_rules:
                 appropriate_handlers.append((nrules, handler))
 
         if len(appropriate_handlers) == 0:
-            print('No handler for this event!')
-            return
+            return []
+        
         appropriate_handlers.sort(key=lambda pair: pair[0], reverse=True)
         main_handler = appropriate_handlers[0][1]
         additional_handlers = list(map(lambda handler: handler[1], filter(lambda handler: handler[1].isAdditional, appropriate_handlers[1:])))
-        main_handler(*args, **kwargs)
-        for additional_handler in additional_handlers:
-            additional_handler(*args, **kwargs)
+
+        return [main_handler] + additional_handlers
 
 
-        
-
-    def registerHandler(self, additional: bool = False, **rules) -> Callable:
+    def registerHandler(self: Self, additional: bool = False, **rules) -> Callable:
         def deco(function: Callable) -> Callable:
             self.__handlers.append(Handler(function, additional=additional, **rules))
             return function
