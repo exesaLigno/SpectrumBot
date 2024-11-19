@@ -110,6 +110,20 @@ class Message(Event):
         
         return None
     
+    def edit(
+            self: Self,
+            text: str | None,
+            photo: BytesIO | bytes | None = None,
+            keyboard: list[list[tuple[str, str]]] | None = None
+        ):
+        responce = self.editMessage(self.chat_id, self.message_id, text=text, photo=photo, keyboard=keyboard)
+        if responce['connection_established'] and responce['ok']:
+            return Message(self.token, responce['result'])
+        else:
+            print(responce)
+
+        return None
+    
     def delete(self: Self) -> None:
         responce = self.deleteMessage(self.chat_id, self.message_id)
         return responce['connection_established'] and responce['ok']

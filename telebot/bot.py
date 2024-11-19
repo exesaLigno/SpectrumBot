@@ -101,7 +101,7 @@ class TelegramBot(TextPreprocessor, KeyboardPreprocessor, TelegramAPI):
             
             except Exception as error:
                 if supress_exceptions:
-                    print(f'Error {error} occured')
+                    print(f'Error {error} occurred')
                     continue
                 else:
                     traceback.print_exc()

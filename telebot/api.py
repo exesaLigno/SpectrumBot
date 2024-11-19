@@ -1,6 +1,6 @@
 import requests
 from io import BytesIO
-from typing import Any
+from typing import Any, Self
 from json import dumps
 
 class TelegramAPI(object):
@@ -63,7 +63,8 @@ class TelegramAPI(object):
         return None
     
     def sendMessage(
-            self, chat_id, 
+            self: Self, 
+            chat_id: int, 
             text: str | None, 
             photo: BytesIO | bytes | None = None, 
             reply_to: int | None = None, 
@@ -99,4 +100,35 @@ class TelegramAPI(object):
     def deleteMessage(self, chat_id, message_id):
         return self.__makeRequest('deleteMessage', chat_id=chat_id, message_id=message_id)
     
+    def editMessage(
+            self: Self, 
+            chat_id: int,
+            message_id: int,
+            text: str | None,
+            photo: BytesIO | bytes | None = None,
+            keyboard: list[list[tuple[str, str]]] | None = None
+        ):
+
+        reply_markup = None
+        if keyboard is not None:
+            for line_no in range(len(keyboard)):
+                for key_no in range(len(keyboard[line_no])):
+                    keyboard[line_no][key_no] = {
+                        'text': keyboard[line_no][key_no][0], 
+                        'callback_data': keyboard[line_no][key_no][1]
+                    }
+            reply_markup = dumps({"inline_keyboard": keyboard}, ensure_ascii = False)
+
+        if photo is not None:
+            if isinstance(photo, BytesIO):
+                photo = photo.read()
+
+            media = {'type': 'photo', 'media': 'attach://photo'}
+            if text is not None:
+                media['caption'] = text
+            
+            return self.__makeRequest('editMessageMedia', post_arguments={'photo': photo}, chat_id=chat_id, message_id=message_id, media=dumps(media), reply_markup = reply_markup, parse_mode = "HTML")
+        
+        else:
+            return self.__makeRequest('editMessageText', chat_id=chat_id, message_id=message_id, text=text, reply_markup = reply_markup, parse_mode = "HTML")
     
