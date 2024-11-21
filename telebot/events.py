@@ -135,7 +135,6 @@ class Message(Event):
         return base_props
 
 
-from pprint import pprint
 class Callback(Event):
 
     def __init__(self: Self, token: str, callback_dict: dict):
@@ -149,3 +148,8 @@ class Callback(Event):
     def answer(self: Self, text: str, show_alert: bool = False):
         responce = self.answerCallbackQuery(self.id, text, show_alert=show_alert)
         return responce['connection_established'] and responce['ok']
+
+
+class ScheduledEvent(Event):
+    def __init__(self: Self, token: str):
+        Event.__init__(self, token=token)

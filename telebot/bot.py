@@ -133,3 +133,6 @@ class TelegramBot(TextPreprocessor, KeyboardPreprocessor, TelegramAPI):
             return function
         return deco
 
+
+    def scheduleEvent(self: Self, event: Event):
+        pass
